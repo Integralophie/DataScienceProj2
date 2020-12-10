@@ -1,0 +1,72 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(modelr)
+library(broom)
+
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+filename  <- "./data/AviationData.txt"
+
+df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
+
+df_aviation <- df_aviation %>%
+  filter(str_detect(Aircraft.Category, "Airplane"))
+
+df_aviation
+```
+
+```{r}
+df_aviation_general <- df_aviation %>%
+  filter (str_detect(FAR.Description, "91"), str_detect(Investigation.Type, "Accident"))
+
+df_aviation_general %>%
+  count(Total.Fatal.Injuries)
+
+df_aviation %>% 
+  count(Total.Fatal.Injuries)
+
+df_aviation %>%
+  filter(Total.Fatal.Injuries > 150)
+```
+```{r}
+df_aviation_general %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = Broad.Phase.of.Flight, y = Total.Fatal.Injuries )) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+
+
+```{r}
+phase_count_fatal <- df_aviation %>% 
+  filter(Injury.Severity != "Non-Fatal") %>%
+  count(Broad.Phase.of.Flight) %>%
+  mutate(
+    phase = Broad.Phase.of.Flight
+  )
+
+phase_count_non_fatal <- df_aviation %>% 
+  filter(Injury.Severity == "Non-Fatal") %>%
+  count(Broad.Phase.of.Flight) %>%
+  mutate(
+    phase = Broad.Phase.of.Flight
+  )
+
+p<- ggplot() +
+  geom_point(data = phase_count_non_fatal, stat="identity", aes(x= reorder(phase, -n), y=n, color = 'red')) +
+  geom_bar(data = phase_count_fatal, stat="identity", aes(x= reorder(phase, -n), y=n)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+p
+```
+
