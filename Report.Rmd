@@ -84,7 +84,8 @@ df_binomial %>%
   group_by(Aircraft.Damage) %>% 
   count(Fatal) %>%
   ggplot(aes(x = Aircraft.Damage, y = n, fill = Fatal)) +
-  geom_col(position = "dodge")
+  geom_col(position = "dodge") +
+  ggtitle("Number of Fatal and Non-fatal Crashes for different Damage")
 ```
 
 **Observations:** 
@@ -92,6 +93,14 @@ df_binomial %>%
 We can reasonably assume that, when an aircraft is severely damaged or destroyed, there is a higher probability of having fatalities, while for minor and substantial damages the fatality is much lower. This figure above proves that, the destroyed air crashes are much more fatal comparing to other categories. 
 
 The `Aircraft.Damage` criteria will be studied in later sections where a model is fitted to figure out how much the aircraft damage contributes to fatality. 
+
+### Air crashes and date
+
+
+**Observations:**
+
+According to the figure above, the number of crashes reaches maximum in July and Augest. 
+
 
 
 
@@ -120,7 +129,7 @@ fit_weather %>% tidy()
 ### A model calculating the predicting effect of aircraft damage
 
 ```{r}
- fit_weather <-
+ fit_damage <-
   glm(
     formula = Fatal ~ Aircraft.Damage,
     data = df_binomial %>%
@@ -131,9 +140,25 @@ fit_weather %>% tidy()
     family = "binomial"
   )
 
-fit_weather %>% tidy()
+fit_damage %>% tidy()
 ```
 
 **Observations:**
+
+
+```{r}
+ fit_date <-
+  glm(
+    formula = Fatal ~ #month + Weather.Condition,
+    data = df_binomial %>%
+      filter(
+        !is.na(Fatal), # month %in% c(" Jan ", " July ", " Oct ")
+      ) %>%
+      mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
+    family = "binomial"
+  )
+
+fit_damage %>% tidy()
+```
 
 
