@@ -23,14 +23,21 @@ The dataset we used contained information on air crashes investigated by the NTS
 
 ```{r}
 library(tidyverse)
+library(modelr)
 library(broom)
+library(scales)
+library(gganimate)
 ```
 
 ## Loading the dataset
 
 ```{r}
 filename  <- "./data/AviationData.txt"
+
 df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
+
+df_aviation <- df_aviation %>%
+  filter(str_detect(Aircraft.Category, "Airplane"))
 
 df_aviation
 ```
@@ -43,7 +50,7 @@ df_aviation %>% glimpse()
 
 **Observations:**
 
-A glimpse at the dataset shows that 63,913 accidents and incidents are recorded in this dataset. 32 columns are presented, in which the total number of fatal, serious, and minor injuries, as well as the total uninjured number are recorded as output variables, and other variables including `Make`, `Model`, `Number.of.Engines`, `Engine.Type`, `Purpose.of.Flight` and `Broad.Phase.of.Flight` are interpreted as input variables in this study. 
+A glimpse at the dataset shows that 6,732 accidents and incidents are recorded in this dataset. 32 columns are presented, in which the total number of fatal, serious, and minor injuries, as well as the total uninjured number are recorded as output variables, and other variables including `Make`, `Model`, `Number.of.Engines`, `Engine.Type`, `Purpose.of.Flight` and `Broad.Phase.of.Flight` are interpreted as input variables in this study. 
 
 ```{r}
 df_binomial <- df_aviation %>% mutate(Fatal = as.logical(Total.Fatal.Injuries))
@@ -52,9 +59,157 @@ df_binomial %>% count(Fatal)
 
 **Observations:**
 
-A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that from 1982 to 2007, there are 39930 non-fatal crashes and 12582 fatal crashes, and 11401 flight crash information are not available. 
+A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that from 1982 to 2007, there are 2623 non-fatal crashes and 944 fatal crashes, and 3165 flight crash information are not available. 
 
 ## Visualizations
+
+```{r}
+df_aviation_general <- df_aviation %>%
+  filter (str_detect(FAR.Description, "91"), str_detect(Investigation.Type, "Accident"))
+
+df_aviation_general %>%
+  count(Total.Fatal.Injuries)
+
+df_aviation %>% 
+  count(Total.Fatal.Injuries)
+
+df_aviation %>%
+  filter(Total.Fatal.Injuries > 150)
+```
+
+```{r}
+df_aviation_general %>%
+  filter(Total.Fatal.Injuries < 150) %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = Broad.Phase.of.Flight, y = Total.Fatal.Injuries )) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+### Broad phase of flight
+
+```{r}
+phase_count_fatal <- df_aviation %>% 
+  filter(Injury.Severity != "Non-Fatal") %>%
+  count(Broad.Phase.of.Flight) %>%
+  mutate(
+    phase = Broad.Phase.of.Flight
+  )
+
+phase_count_non_fatal <- df_aviation %>% 
+  filter(Injury.Severity == "Non-Fatal") %>%
+  count(Broad.Phase.of.Flight) %>%
+  mutate(
+    phase = Broad.Phase.of.Flight
+  )
+
+p<- ggplot() +
+  geom_point(data = phase_count_non_fatal, stat = "identity", aes(x = reorder(phase, -n), y=n, color = 'red')) +
+  geom_bar(data = phase_count_fatal, stat = "identity", aes(x= reorder(phase, -n), y = n)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+p
+```
+
+**Observations:**
+
+### Air crashes and dates
+
+```{r}
+df_date <- df_aviation %>%
+  count(Event.Date) %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6)
+  ) %>%
+  group_by(Month.Day) %>%
+  mutate(
+    count = sum(n)
+  ) 
+
+glimpse(df_date)
+
+df_date$Month.Day <- as.Date(df_date$Month.Day, "%m/%d")
+
+
+df_date %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Month.Day, y = count, fill = )) +
+  scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
+             date_labels = "%B") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  ggtitle("Accidents by Time of Year")
+
+df_date %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Month.Day, y = count )) +
+  scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
+             date_labels = "%B") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  ggtitle("Accidents by Time of Year")
+```
+
+**Observations:**
+
+
+```{r}
+df_date_polar <-df_aviation %>%
+  count(Event.Date) %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
+  ) 
+
+df_date_polar$Month.Day = as.Date(df_date_polar$Month.Day, format = "%m/%d")
+df_date_polar$Date = as.Date(df_date_polar$Date, format = "%Y-%m-%d")
+df_date_polar$Month = as.Date(df_date_polar$Month, format = "%Y-%m-%d")
+
+df_date_polar
+```
+
+```{r}
+# AGGREGATED BY MONTH
+
+#preprocess data
+df_month <- df_date_polar %>%
+  group_by(Month, Year) %>%
+  mutate(
+    count = sum(n) 
+  ) %>%
+  ungroup() %>%
+  arrange(Date) %>%
+  mutate(
+    frame = seq.int(nrow(df_date_polar))
+  )
+
+df_month$smoothed <- predict(loess(n ~ as.numeric(Date), data = df_month), newdata = df_month[, c("Date")])
+
+
+fig <- df_month %>%
+  ggplot(aes(x = Month, y = count, group = Year, color = Year)) +
+  theme_bw() +
+  theme(
+    rect = element_blank(),
+    axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(title = "Monthly Plane Accidents") +
+  geom_line(aes(group = Year), size = 0.15) +
+  geom_point(color = "gray20") +
+  scale_y_continuous() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b", expand = expansion(add = c(0, -15))) +
+  geom_text(aes(x = as.Date("2020-10-01"), y = 300, label = Year), position = position_nudge(y = -0.1, x = 0), size = 10, color = "gray20") +
+  transition_reveal(along = frame, keep_last = FALSE)
+
+animate(fig, nframes = 200, fps = 10, width=1200,height=800, res = 130,
+        render = av_renderer("Monthly Airplane Accidents.mp4", codec = "libx264"))
+
+
+
+```
+
+
+
+
 
 ### Weather conditions
 
@@ -93,15 +248,6 @@ df_binomial %>%
 We can reasonably assume that, when an aircraft is severely damaged or destroyed, there is a higher probability of having fatalities, while for minor and substantial damages the fatality is much lower. This figure above proves that, the destroyed air crashes are much more fatal comparing to other categories. 
 
 The `Aircraft.Damage` criteria will be studied in later sections where a model is fitted to figure out how much the aircraft damage contributes to fatality. 
-
-### Air crashes and date
-
-
-**Observations:**
-
-According to the figure above, the number of crashes reaches maximum in July and Augest. 
-
-
 
 
 ## Modeling
@@ -147,18 +293,41 @@ fit_damage %>% tidy()
 
 
 ```{r}
+
+df_date_polar <-df_aviation %>%
+  filter(str_detect(Aircraft.Category, "Airplane"), str_detect(Investigation.Type, "Accident")) %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = substr(Event.Date, 2, 3)
+  ) %>%
+  mutate(Month = as.integer(Month)) %>%
+  mutate(Fatal = as.logical(Total.Fatal.Injuries))
+  
+
+df_date_polar %>% summary()
+```
+
+
+# THIS PART IS NOT DONE!!!
+
+```{r}
  fit_date <-
   glm(
-    formula = Fatal ~ #month + Weather.Condition,
-    data = df_binomial %>%
+    formula = Fatal ~ Month + Weather.Condition,
+    data = df_date_polar %>%
       filter(
-        !is.na(Fatal), # month %in% c(" Jan ", " July ", " Oct ")
+        !is.na(Fatal), 
+        Month %in% c(1, 7, 10),
+        Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
       ) %>%
       mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
     family = "binomial"
   )
 
-fit_damage %>% tidy()
+fit_date %>% tidy()
 ```
 
+**Observations:**
 
