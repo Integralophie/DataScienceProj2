@@ -1,11 +1,26 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Structural Safety"
+author: "Erika Lu & Sophie Wu"
+date: 2020-12-10
+output:
+  github_document:
+    toc: true
 ---
 
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+**Notes:**
+
+several notes for this dataset: this dataset contains information on air crashes investigated by National Transportation Safety Board. The investigation range of NTSB includes all air crashes happened within U.S. territory, or the involved aircraft are U.S. made, or the aircraft carries passenger/crew member that are U.S. citizens, or otherwise invited by the transportation safety bureau from another country. 
+
+
+```{r}
+library(tidyverse)
+library(broom)
+```
+
 
 ```{r}
 filename  <- "./data/AviationData.txt"
@@ -15,7 +30,83 @@ df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
 df_aviation
 ```
 
+```{r}
+df_aviation %>% summary()
+```
+```{r}
+df_binomial_business <- df_binomial %>% 
+  filter(FAR.Description == " Part 121: Air Carrier ")
+df_binomial_business
+```
+```{r}
+#put this figure later, when we put in business as a control, the weather condition changes 
+df_binomial_business %>%
+  filter(Injury.Severity != " Non-Fatal ", Injury.Severity != " Incident ") %>%
+  ggplot(aes(x = Injury.Severity)) +
+  geom_bar() +
+  coord_flip()
+```
+
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+```{r}
+df_binomial <- df_aviation %>% mutate(Fatal = as.logical(Total.Fatal.Injuries)) 
+
+
+df_binomial %>% count(Fatal)
+```
+A simple check of this dataset reveals that from 1982 to 2007, there are 39930 non-fatal crashes and 12582 fatal crashes, and 11401 flight crash information are not available. 
+
+```{r}
+# VMC stands for visual, IMC is instrument, UNK is unknown
+
+df_binomial %>%
+  filter(is.na(Fatal) == FALSE) %>% 
+  group_by(Weather.Condition) %>% 
+  count(Fatal) %>%
+  ggplot(aes(x = Weather.Condition, y = n, fill = Fatal)) +
+  geom_col(position = "dodge")
+```
+**Observations:**
+By directly comparing the number, it may seem like there are a larger number of fatal accidents in VMC condition comparing to IMC. However, this may be due to the fact that more accidents happen in VMC conditions. The next model shows that IMC gives a much higher odds of fatality (using unknown as reference level), while the value for VMC is much lower. 
+
+
+```{r}
+fit_weather <-
+  glm(
+    formula = Fatal ~ Weather.Condition,
+    data = df_binomial %>%
+      filter(
+        !is.na(Fatal), Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
+      ) %>%
+      mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
+    family = "binomial"
+  )
+
+fit_weather %>% tidy()
+```
+
+```{r}
+df_binomial %>%
+  filter(is.na(Fatal) == FALSE) %>% 
+  group_by(Aircraft.Damage) %>% 
+  count(Fatal) %>%
+  ggplot(aes(x = Aircraft.Damage, y = n, fill = Fatal)) +
+  geom_col(position = "dodge")
+```
+```{r}
+fit_weather <-
+  glm(
+    formula = Fatal ~ Aircraft.Damage,
+    data = df_binomial %>%
+      filter(
+        !is.na(Fatal), Aircraft.Damage %in% c(" Destroyed ", " Minor ", " Substantial ")
+      ) %>%
+      mutate(Aircraft.Damage = fct_relevel(Aircraft.Damage, " Substantial ")),
+    family = "binomial"
+  )
+
+fit_weather %>% tidy()
+```
 
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
 

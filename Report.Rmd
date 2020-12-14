@@ -1,0 +1,139 @@
+---
+title: 'Air Crash Investigation: How does Flight Conditions affect Fatality?'
+author: "Erika Lu & Sophie Wu"
+date: '2020-12-14'
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  github_document:
+    toc: yes
+---
+
+## Purpose
+
+In this project, we focus on studying the air crash investigation dataset from National Transportation Safety Board (NTSB). We want to study the question: How well can flight parameters (engine type/number, weather condition, the broad phase of flight, etc.) be used to predict the fatality of a flight? 
+
+
+## Background 
+
+The dataset we used contained information on air crashes investigated by the NTSB from 1982 to 2007. The investigation range of NTSB includes all air crashes happened within U.S. territory, or when the involved aircraft are U.S. made, or the aircraft carries passengers/crew members that are U.S. citizens, or otherwise invited by the transportation safety bureau from another country. Commercial airline crashes as well as other aviation crashes are included in this dataset. 
+
+## Setup
+
+```{r}
+library(tidyverse)
+library(broom)
+```
+
+## Loading the dataset
+
+```{r}
+filename  <- "./data/AviationData.txt"
+df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
+
+df_aviation
+```
+
+## Initial inspection of the dataset
+
+```{r}
+df_aviation %>% glimpse()
+```
+
+**Observations:**
+
+A glimpse at the dataset shows that 63,913 accidents and incidents are recorded in this dataset. 32 columns are presented, in which the total number of fatal, serious, and minor injuries, as well as the total uninjured number are recorded as output variables, and other variables including `Make`, `Model`, `Number.of.Engines`, `Engine.Type`, `Purpose.of.Flight` and `Broad.Phase.of.Flight` are interpreted as input variables in this study. 
+
+```{r}
+df_binomial <- df_aviation %>% mutate(Fatal = as.logical(Total.Fatal.Injuries))
+df_binomial %>% count(Fatal)
+```
+
+**Observations:**
+
+A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that from 1982 to 2007, there are 39930 non-fatal crashes and 12582 fatal crashes, and 11401 flight crash information are not available. 
+
+## Visualizations
+
+### Weather conditions
+
+```{r}
+df_binomial %>%
+  filter(is.na(Fatal) == FALSE) %>% 
+  group_by(Weather.Condition) %>% 
+  count(Fatal) %>%
+  ggplot(aes(x = Weather.Condition, y = n, fill = Fatal)) +
+  geom_col(position = "dodge") +
+  ggtitle("Number of Fatal and Non-fatal Crashes in Different Weather Conditions")
+```
+
+**Observations:**
+
+VMC, or visual meteorological conditions, means that pilots have sufficient visibility to fly the aircraft maintaining visual separation from terrain and other aircraft. IMC, or instrumental meteorological conditions, means that pilots need to fly primarily by reference to instruments, and therefore under instrument flight rules (IFR). Typically, IMC means flying in cloudy or bad weather, while VMC means fine weather. 
+
+Comparing the absolute value of fatal crashes in VMC is higher than IMC. However, this may be due to the fact that much more flights are flown in VMC, as flights are likely to be canceled or diverted in deteriorating weather. Comparing the ratio of fatal and non-fatal crashes in VMC and IMC, it turns out that in IMC the crashes have a higher odds of being fatal. 
+
+The contribution of weather condition to a fatal crash will be investigated in later sections by fitting it into a logistic model. 
+
+### Aircraft damage
+
+```{r}
+df_binomial %>%
+  filter(is.na(Fatal) == FALSE) %>% 
+  group_by(Aircraft.Damage) %>% 
+  count(Fatal) %>%
+  ggplot(aes(x = Aircraft.Damage, y = n, fill = Fatal)) +
+  geom_col(position = "dodge")
+```
+
+**Observations:** 
+
+We can reasonably assume that, when an aircraft is severely damaged or destroyed, there is a higher probability of having fatalities, while for minor and substantial damages the fatality is much lower. This figure above proves that, the destroyed air crashes are much more fatal comparing to other categories. 
+
+The `Aircraft.Damage` criteria will be studied in later sections where a model is fitted to figure out how much the aircraft damage contributes to fatality. 
+
+
+
+## Modeling
+
+### A model calculating the effect of weather condition on fatality
+
+```{r}
+fit_weather <-
+  glm(
+    formula = Fatal ~ Weather.Condition,
+    data = df_binomial %>%
+      filter(
+        !is.na(Fatal), Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
+      ) %>%
+      mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
+    family = "binomial"
+  )
+
+fit_weather %>% tidy()
+```
+
+**Observations:**
+
+
+### A model calculating the predicting effect of aircraft damage
+
+```{r}
+ fit_weather <-
+  glm(
+    formula = Fatal ~ Aircraft.Damage,
+    data = df_binomial %>%
+      filter(
+        !is.na(Fatal), Aircraft.Damage %in% c(" Destroyed ", " Minor ", " Substantial ")
+      ) %>%
+      mutate(Aircraft.Damage = fct_relevel(Aircraft.Damage, " Substantial ")),
+    family = "binomial"
+  )
+
+fit_weather %>% tidy()
+```
+
+**Observations:**
+
+
