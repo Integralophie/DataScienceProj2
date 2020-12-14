@@ -1,0 +1,201 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(modelr)
+library(broom)
+library(scales)
+
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+filename  <- "./data/AviationData.txt"
+
+df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
+
+df_aviation <- df_aviation %>%
+  filter(str_detect(Aircraft.Category, "Airplane"))
+
+df_aviation
+```
+
+```{r}
+df_aviation_general <- df_aviation %>%
+  filter (str_detect(FAR.Description, "91"), str_detect(Investigation.Type, "Accident"))
+
+df_aviation_general %>%
+  count(Total.Fatal.Injuries)
+
+df_aviation %>% 
+  count(Total.Fatal.Injuries)
+
+df_aviation %>%
+  filter(Total.Fatal.Injuries > 150)
+```
+```{r}
+df_aviation_general %>%
+  filter(Total.Fatal.Injuries < 150) %>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = Broad.Phase.of.Flight, y = Total.Fatal.Injuries )) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+
+
+```{r}
+phase_count_fatal <- df_aviation %>% 
+  filter(Injury.Severity != "Non-Fatal") %>%
+  count(Broad.Phase.of.Flight) %>%
+  mutate(
+    phase = Broad.Phase.of.Flight
+  )
+
+phase_count_non_fatal <- df_aviation %>% 
+  filter(Injury.Severity == "Non-Fatal") %>%
+  count(Broad.Phase.of.Flight) %>%
+  mutate(
+    phase = Broad.Phase.of.Flight
+  )
+
+p<- ggplot() +
+  geom_point(data = phase_count_non_fatal, stat="identity", aes(x= reorder(phase, -n), y=n, color = 'red')) +
+  geom_bar(data = phase_count_fatal, stat="identity", aes(x= reorder(phase, -n), y=n)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+p
+```
+```{r}
+df_date <-df_aviation %>%
+  count(Event.Date) %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6)
+  ) %>%
+  group_by(Month.Day) %>%
+  mutate(
+    count = sum(n)
+  ) 
+
+glimpse(df_date)
+
+df_date$Month.Day <- as.Date(df_date$Month.Day, "%m/%d")
+
+
+df_date %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Month.Day, y = count, fill = )) +
+  scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
+             date_labels = "%B") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  ggtitle("Accidents by Time of Year")
+
+df_date %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Month.Day, y = count )) +
+  scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
+             date_labels = "%B") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  ggtitle("Accidents by Time of Year")
+
+```
+```{r}
+library(gganimate)
+```
+
+```{r}
+df_date_polar <-df_aviation %>%
+  count(Event.Date) %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
+  ) 
+
+df_date_polar$Month.Day = as.Date(df_date_polar$Month.Day, format = "%m/%d")
+df_date_polar$Date = as.Date(df_date_polar$Date, format = "%Y-%m-%d")
+df_date_polar$Month = as.Date(df_date_polar$Month, format = "%Y-%m-%d")
+
+df_date_polar
+
+```
+```{r}
+# AGGREGATED BY MONTH
+
+#preprocess data
+df_month <- df_date_polar %>%
+  group_by(Month, Year) %>%
+  mutate(
+    count = sum(n) 
+  ) %>%
+  ungroup() %>%
+  arrange(Date) %>%
+  mutate(
+    frame = seq.int(nrow(df_date_polar))
+  )
+
+df_month$smoothed <- predict(loess(n ~ as.numeric(Date), data = df_month), newdata = df_month[, c("Date")])
+
+
+fig <- df_month %>%
+  ggplot(aes(x = Month, y = count, group = Year, color = Year)) +
+  theme_bw() +
+  theme(
+    rect = element_blank(),
+    axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(title = "Monthly Plane Accidents") +
+  geom_line(aes(group = Year), size = 0.15) +
+  geom_point(color = "gray20") +
+  scale_y_continuous() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b", expand = expansion(add = c(0, -15))) +
+  geom_text(aes(x = as.Date("2020-10-01"), y = 300, label = Year), position = position_nudge(y = -0.1, x = 0), size = 10, color = "gray20") +
+  transition_reveal(along = frame, keep_last = FALSE)
+
+animate(fig, nframes = 200, fps = 10, width=1200,height=800, res = 130,
+        render = av_renderer("Monthly Airplane Accidents.mp4", codec = "libx264"))
+
+
+
+```
+
+
+```{r}
+df_date_polar <- df_date_polar %>% arrange(Date)
+df_date_polar$frame <- seq.int(nrow(df_date_polar))
+
+df_date_polar$smoothed <- predict(loess(n ~ as.numeric(Date), data = df_date_polar), newdata = df_date_polar[, c("Date")])
+
+
+fig <- df_date_polar %>%
+  ggplot(aes(x = Month.Day, y = n)) +
+  theme_bw() +
+  theme(
+    rect = element_blank(),
+    axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(title = "Daily Plane Accidents") +
+  geom_line(aes(group = Year), size = 0.25) +
+  geom_point(color = "gray20") +
+  scale_y_continuous() +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b", expand = expansion(add = c(0, -15))) +
+  geom_text(aes(y = smoothed, label = Year), nudge_x = 15, size = 3, color = "gray20") +
+  transition_reveal(along = frame, keep_last = FALSE)
+
+animate(fig, nframes = 500, fps = 60, width=1200,height=800, end_pause = 200, res = 130,
+        render = av_renderer("slovenia_deaths.mp4", codec = "libx264"))
+
+# animate(fig, renderer = gifski_renderer())
+
+```
+
+
+
