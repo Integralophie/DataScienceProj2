@@ -25,9 +25,100 @@ df_aviation <- df_aviation %>%
   mutate(
     IsGeneralAviation = str_detect(FAR.Description, "91")
   )
-
-df_aviation
 ```
+
+```{r}
+df_aviation_dates <-df_aviation %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
+  ) 
+
+df_aviation_dates$Month.Day = as.Date(df_aviation_dates$Month.Day, format = "%m/%d")
+df_aviation_dates$Date = as.Date(df_aviation_dates$Date, format = "%Y-%m-%d")
+df_aviation_dates$Month = as.Date(df_aviation_dates$Month, format = "%Y-%m-%d")
+
+df_aviation_dates
+```
+
+```{r}
+df_aviation_dates <-df_aviation %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
+  ) 
+
+df_aviation_dates$Month.Day = as.Date(df_aviation_dates$Month.Day, format = "%m/%d")
+df_aviation_dates$Date = as.Date(df_aviation_dates$Date, format = "%Y-%m-%d")
+df_aviation_dates$Month = as.Date(df_aviation_dates$Month, format = "%Y-%m-%d")
+
+```
+
+```{r}
+df_aviation_dates%>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = factor(format(Month, "%b")), y = Total.Fatal.Injuries, color = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other")) ) +
+  labs(x = "Month",
+      y = "Deaths",
+      color = "Flight Type") +
+  ggtitle("Fatalities Per Accident") +
+  scale_y_log10()
+```
+
+
+
+
+```{r}
+library("ggplot2")
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+class(world)
+
+blank_theme <- theme_minimal()+
+  theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.border = element_blank(),
+  panel.grid=element_blank(),
+  axis.ticks = element_blank(),
+  plot.title=element_text(size=14, face="bold"),
+  )
+
+# devtools::install_github('UrbanInstitute/urbnmapr')
+
+df_2003 <- df_aviation_dates %>%
+  select (
+    Year,
+    Longitude,
+    Latitude,
+    IsGeneralAviation
+  ) %>%
+  drop_na()
+
+
+ggplot(data = world) +
+  geom_sf() +
+  geom_point(data = df_2003, aes(x = Longitude, y = Latitude, fill = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other")), size = 1, 
+      shape = 23) +
+  coord_sf(xlim = c(-130, -65), ylim = c(20, 60), expand = FALSE) +
+  blank_theme +
+  theme(
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank()
+    ) +
+  labs(fill = "Flight Type") +
+  ggtitle("Aviation Accident Sites")
+
+
+```
+
 
 ```{r}
 df_aviation_general <- df_aviation %>%

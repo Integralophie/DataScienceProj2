@@ -142,6 +142,20 @@ df_aviation_dates$Month = as.Date(df_aviation_dates$Month, format = "%Y-%m-%d")
 ```
 
 ```{r}
+df_aviation_dates%>%
+  ggplot() +
+  geom_boxplot(mapping = aes(x = factor(format(Month, "%m")), y = Total.Fatal.Injuries, color = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other")) ) +
+  labs(x = "Month",
+      y = "Deaths",
+      color = "Flight Type") +
+  ggtitle("Fatalities Per Accident") +
+  scale_y_log10()
+```
+**Observations:**
+Commercial + Other flights tend to have higher fatalities every month compared to General Aviation. This may be due to the fact that GA planes tend to be much smaller and usually carries the pilot and a handful of passengers. It is difficult to see a trend of how month affects the fatality of an accident but it looks like there may be slightly more fatalies per accident in the months of August and October for Commercial + Other flights. 
+
+
+```{r}
 df_aviation_dates %>%
   count(Month.Day) %>%
   ggplot() +
@@ -151,7 +165,7 @@ df_aviation_dates %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
   ggtitle("Accidents by Time of Year")
 ```
-
+**Observations:**
 
 ```{r}
 # AGGREGATED BY MONTH
@@ -191,9 +205,60 @@ animate(fig, renderer = gifski_renderer(), width=1200, height=800)
 
 
 **Observations:**
-One reason we see more accidents in the middle of the year is that more people have time to fly (whether for hobby or travel) during the summer months due to the United States vacation schedule. More flights lead to more accidents.
+This graph looks at occurences of accidents rather than fatality to better understand the dataset. 
+
+One reason we may see more accidents in the middle of the year is that more people have time to fly (whether for hobby or travel) during the summer months due to the United States vacation schedule. More flights lead to more accidents. If the scope of our project was wider, we would analyze data on all flights, rather than just the accidents. 
 
 Another reason that may explain why accidents occur more often in June and July: during that time thunderstorms are more frequent and more severe, and microbursts can occur, leading to poor visibility and unstable flights (especially at landing).
+
+### Geography
+
+
+```{r}
+library("ggplot2")
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+blank_theme <- theme_minimal()+
+  theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.border = element_blank(),
+  panel.grid=element_blank(),
+  axis.ticks = element_blank(),
+  plot.title=element_text(size=14, face="bold"),
+  )
+
+df_2003 <- df_aviation_dates %>%
+  select (
+    Year,
+    Longitude,
+    Latitude,
+    IsGeneralAviation
+  ) %>%
+  drop_na()
+
+
+ggplot(data = world) +
+  geom_sf() +
+  geom_point(data = df_2003, aes(x = Longitude, y = Latitude, fill = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other")), size = 1, 
+      shape = 23) +
+  coord_sf(xlim = c(-130, -65), ylim = c(20, 60), expand = FALSE) +
+  blank_theme +
+  theme(
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank()
+    ) +
+  labs(fill = "Flight Type") +
+  ggtitle("Aviation Accident Sites")
+```
+**Observations:**
+While there is no discernible trend for Commercial + Other type accidents, we see that General Aviation accidents happen most often along the coasts and in the north east.
+
+This may be due to confounding variables such as population and wealth that would increase the prevalence of GA pilots on the coast. Or perhaps planes are more prone to accidents in coastal weather. 
 
 ### Weather conditions
 
@@ -206,6 +271,51 @@ df_binomial %>%
   geom_col(position = "dodge") +
   ggtitle("Number of Fatal and Non-fatal Crashes in Different Weather Conditions")
 ```
+```{r}
+
+
+df_binomial %>%
+  filter(!is.na(Fatal), IsGeneralAviation) %>%
+  group_by(Fatal, IsGeneralAviation, Weather.Condition) %>%
+  summarize(
+    count = n(),
+  ) %>%
+  ggplot() +
+  geom_bar(mapping = aes(x = "", y = count, fill = Fatal ), stat = "identity", position = position_fill()) +
+  
+  # Styling 
+  blank_theme +
+  theme(
+    axis.text.x=element_blank()
+        ) +
+    labs(fill = "Fatal") +
+  coord_polar(theta = "y", start = 0) +
+  #Facet
+  facet_wrap(~Weather.Condition) +
+  ggtitle("Flight Fatalities (General Aviation)")
+
+df_binomial %>%
+  filter(!is.na(Fatal), !IsGeneralAviation) %>%
+  group_by(Fatal, IsGeneralAviation, Weather.Condition) %>%
+  summarize(
+    count = n(),
+  ) %>%
+  ggplot() +
+  geom_bar(mapping = aes(x = "", y = count, fill = Fatal ), stat = "identity", position = position_fill()) +
+  
+  # Styling 
+  blank_theme +
+  theme(
+    axis.text.x=element_blank()
+        ) +
+    labs(fill = "Fatal") +
+  coord_polar(theta = "y", start = 0) +
+  #Facet
+  facet_wrap(~Weather.Condition) +
+  ggtitle("Flight Fatalities (Non General Aviation)")
+
+```
+
 
 **Observations:**
 
@@ -282,11 +392,11 @@ The estimate for destroyed aircraft for modeling fatality is much higher, while 
 
 ### Fitting a model with two variables
 
-We noticed from the previous figure that in June, July and August, there is a peak in air crashes. We thus made a hypothesis that the more frequent severe weather including thunderstroms are microbursts during that time period contributes to the higher frequency of air crashes. 
+We noticed from the previous figure that in June, July and August, there is a peak in air crashes. We thus made a hypothesis that the more frequent severe weather including thunderstorms are microbursts during that time period contributes to the higher frequency of air crashes. 
 
 ```{r}
 
-df_date_polar <-df_aviation %>%
+df_date<-df_aviation %>%
   filter(str_detect(Aircraft.Category, "Airplane"), str_detect(Investigation.Type, "Accident")) %>%
   mutate(
     Month.Day = substr(Event.Date,2,6),
@@ -297,11 +407,11 @@ df_date_polar <-df_aviation %>%
   mutate(Month = as.integer(Month)) %>%
   mutate(Fatal = as.logical(Total.Fatal.Injuries))
   
-df_date_polar %>% summary()
+df_date %>% summary()
   fit_date <-
    glm(
      formula = Fatal ~ Month + Weather.Condition,
-     data = df_date_polar %>%
+     data = df_date %>%
        filter(
          !is.na(Fatal), 
          Month %in% c(6, 7, 8),
