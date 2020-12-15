@@ -66,6 +66,12 @@ df_binomial %>% count(Fatal)
 
 A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that from 1982 to 2007, there are 2505 non-fatal crashes and 943 fatal crashes, and 3038 flight crash information are not available. 
 
+```{r}
+df_aviation %>% count(IsGeneralAviation)
+```
+**Observations:**
+Most of the recorded accidents, 5612 of them, are general aviation flights. Other flights make up the rest of the 874 of them.
+
 ## Visualizations
 
 ```{r}
