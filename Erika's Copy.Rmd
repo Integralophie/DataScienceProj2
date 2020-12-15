@@ -21,7 +21,10 @@ filename  <- "./data/AviationData.txt"
 df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
 
 df_aviation <- df_aviation %>%
-  filter(str_detect(Aircraft.Category, "Airplane"))
+  filter(str_detect(Aircraft.Category, "Airplane"), str_detect(Investigation.Type, "Accident")) %>%
+  mutate(
+    IsGeneralAviation = str_detect(FAR.Description, "91")
+  )
 
 df_aviation
 ```
@@ -109,8 +112,7 @@ library(gganimate)
 ```
 
 ```{r}
-df_date_polar <-df_aviation %>%
-  count(Event.Date) %>%
+df_aviation_dates <-df_aviation %>%
   mutate(
     Month.Day = substr(Event.Date,2,6),
     Year = substr(Event.Date, 8, 11),
@@ -118,50 +120,49 @@ df_date_polar <-df_aviation %>%
     Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
   ) 
 
-df_date_polar$Month.Day = as.Date(df_date_polar$Month.Day, format = "%m/%d")
-df_date_polar$Date = as.Date(df_date_polar$Date, format = "%Y-%m-%d")
-df_date_polar$Month = as.Date(df_date_polar$Month, format = "%Y-%m-%d")
+df_aviation_dates$Month.Day = as.Date(df_aviation_dates$Month.Day, format = "%m/%d")
+df_aviation_dates$Date = as.Date(df_aviation_dates$Date, format = "%Y-%m-%d")
+df_aviation_dates$Month = as.Date(df_aviation_dates$Month, format = "%Y-%m-%d")
 
-df_date_polar
+df_aviation_dates
 
 ```
+
 ```{r}
 # AGGREGATED BY MONTH
 
 #preprocess data
-df_month <- df_date_polar %>%
-  group_by(Month, Year) %>%
+df_month <- df_aviation_dates %>%
+  group_by(Month, Year, IsGeneralAviation) %>%
   mutate(
-    count = sum(n) 
+    count = n(),
+    average = mean(n())
   ) %>%
   ungroup() %>%
-  arrange(Date) %>%
-  mutate(
-    frame = seq.int(nrow(df_date_polar))
-  )
+  arrange(Date) 
 
-df_month$smoothed <- predict(loess(n ~ as.numeric(Date), data = df_month), newdata = df_month[, c("Date")])
+df_month$frame <- seq.int(nrow(df_month))
 
+df_month
 
 fig <- df_month %>%
-  ggplot(aes(x = Month, y = count, group = Year, color = Year)) +
+  ggplot(aes(color = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other"))) +
   theme_bw() +
-  theme(
-    rect = element_blank(),
-    axis.title = element_blank(),
-    legend.position = "none"
-  ) +
-  labs(title = "Monthly Plane Accidents") +
-  geom_line(aes(group = Year), size = 0.15) +
-  geom_point(color = "gray20") +
-  scale_y_continuous() +
+  labs(title = "Average Monthly Plane Accidents") +
+  geom_line(data = df_month %>% filter(IsGeneralAviation), aes(x = Month, y = average, group = Year), size = 0.15) +
+  geom_line(data = df_month %>% filter(!IsGeneralAviation), aes(x = Month, y = average, group = Year), size = 0.15) +
+   labs(x = "Month",
+        y = "Accidents",
+        color = "Flight Type") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b", expand = expansion(add = c(0, -15))) +
-  geom_text(aes(x = as.Date("2020-10-01"), y = 300, label = Year), position = position_nudge(y = -0.1, x = 0), size = 10, color = "gray20") +
+  geom_text(aes(x = as.Date("2020-10-01"), y = 260, label = Year), position = position_nudge(y = -0.1, x = 0), size = 10, color = "gray20") +
   transition_reveal(along = frame, keep_last = FALSE)
+
 
 animate(fig, nframes = 200, fps = 10, width=1200,height=800, res = 130,
         render = av_renderer("Monthly Airplane Accidents.mp4", codec = "libx264"))
 
+# animate(fig, renderer = gifski_renderer())
 
 
 ```

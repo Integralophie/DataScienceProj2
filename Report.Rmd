@@ -37,7 +37,10 @@ filename  <- "./data/AviationData.txt"
 df_aviation <- read.delim2(filename, header = TRUE, sep = "|", dec = ".")
 
 df_aviation <- df_aviation %>%
-  filter(str_detect(Aircraft.Category, "Airplane"))
+  filter(str_detect(Aircraft.Category, "Airplane"), str_detect(Investigation.Type, "Accident")) %>%
+  mutate(
+    IsGeneralAviation = str_detect(FAR.Description, "91")
+  )
 
 df_aviation
 ```
@@ -64,79 +67,68 @@ A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that 
 ## Visualizations
 
 ```{r}
-df_aviation_general <- df_aviation %>%
-  filter (str_detect(FAR.Description, "91"), str_detect(Investigation.Type, "Accident"))
+#install.packages("randomcoloR")
 
-df_aviation_general %>%
-  count(Total.Fatal.Injuries)
+library(randomcoloR)
 
-df_aviation %>% 
-  count(Total.Fatal.Injuries)
+# Styling
+blank_theme <- theme_minimal()+
+  theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.border = element_blank(),
+  panel.grid=element_blank(),
+  axis.ticks = element_blank(),
+  plot.title=element_text(size=14, face="bold")
+  )
 
 df_aviation %>%
-  filter(Total.Fatal.Injuries > 150)
-```
-
-```{r}
-df_aviation_general %>%
-  filter(Total.Fatal.Injuries < 150) %>%
+  filter(Broad.Phase.of.Flight != "  ") %>%
+  group_by(Broad.Phase.of.Flight, IsGeneralAviation) %>%
+  summarize(
+    count = n(),
+  ) %>%
   ggplot() +
-  geom_boxplot(mapping = aes(x = Broad.Phase.of.Flight, y = Total.Fatal.Injuries )) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-```
-
-### Broad phase of flight
-
-```{r}
-phase_count_fatal <- df_aviation %>% 
-  filter(Injury.Severity != "Non-Fatal") %>%
-  count(Broad.Phase.of.Flight) %>%
-  mutate(
-    phase = Broad.Phase.of.Flight
-  )
-
-phase_count_non_fatal <- df_aviation %>% 
-  filter(Injury.Severity == "Non-Fatal") %>%
-  count(Broad.Phase.of.Flight) %>%
-  mutate(
-    phase = Broad.Phase.of.Flight
-  )
-
-p<- ggplot() +
-  geom_point(data = phase_count_non_fatal, stat = "identity", aes(x = reorder(phase, -n), y=n, color = 'red')) +
-  geom_bar(data = phase_count_fatal, stat = "identity", aes(x= reorder(phase, -n), y = n)) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-p
+  geom_bar(mapping = aes(x = "", y = count, fill = Broad.Phase.of.Flight ), stat = "identity", position = position_fill()) +
+  
+  # Styling 
+  blank_theme +
+  theme(
+    axis.text.x=element_blank()
+        ) +
+    labs(x = "Month",
+        y = "Accidents",
+        fill = "Flight Type") +
+  scale_fill_manual(values=distinctColorPalette(12))+
+  coord_polar(theta = "y", start = 0) +
+  
+  #Facet
+  facet_wrap(~ ifelse(IsGeneralAviation, "General Aviation (Total: 5581)", "Other (Total: 660)"))
 ```
 
 **Observations:**
 
+Accidents happen more often during certain phases when General Aviation is compared to other types of flights. A dangerous phase for GA is Landing, while not many accidents happen in that phase for other types of flights. This may be due to different dynamics when it comes to smaller planes. GA pilots may also fly in a more risky manner than commercial pilots. GA may be less accident prone during maneuvering because the smaller planes were built to do such maneuvers other planes like passenger planes/cargo planes were are not suited to do such maneuvers and when they do it is because of an emergency.
+
+
 ### Air crashes and dates
 
+
 ```{r}
-df_date <- df_aviation %>%
-  count(Event.Date) %>%
+df_aviation_dates <-df_aviation %>%
   mutate(
-    Month.Day = substr(Event.Date,2,6)
-  ) %>%
-  group_by(Month.Day) %>%
-  mutate(
-    count = sum(n)
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
   ) 
 
-glimpse(df_date)
+df_aviation_dates$Month.Day = as.Date(df_aviation_dates$Month.Day, format = "%m/%d")
+df_aviation_dates$Date = as.Date(df_aviation_dates$Date, format = "%Y-%m-%d")
+df_aviation_dates$Month = as.Date(df_aviation_dates$Month, format = "%Y-%m-%d")
 
-df_date$Month.Day <- as.Date(df_date$Month.Day, "%m/%d")
-
-
-df_date %>%
-  ggplot() +
-  geom_point(mapping = aes(x = Month.Day, y = count, fill = )) +
-  scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
-             date_labels = "%B") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
-  ggtitle("Accidents by Time of Year")
-
+```
+```{r}
 df_date %>%
   ggplot() +
   geom_point(mapping = aes(x = Month.Day, y = count )) +
@@ -146,70 +138,49 @@ df_date %>%
   ggtitle("Accidents by Time of Year")
 ```
 
-**Observations:**
-
-
-```{r}
-df_date_polar <-df_aviation %>%
-  count(Event.Date) %>%
-  mutate(
-    Month.Day = substr(Event.Date,2,6),
-    Year = substr(Event.Date, 8, 11),
-    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
-    Month = paste("2020", substr(Event.Date, 2, 3), "01", sep = "-", collapse = NULL)
-  ) 
-
-df_date_polar$Month.Day = as.Date(df_date_polar$Month.Day, format = "%m/%d")
-df_date_polar$Date = as.Date(df_date_polar$Date, format = "%Y-%m-%d")
-df_date_polar$Month = as.Date(df_date_polar$Month, format = "%Y-%m-%d")
-
-df_date_polar
-```
-
 ```{r}
 # AGGREGATED BY MONTH
 
 #preprocess data
-df_month <- df_date_polar %>%
-  group_by(Month, Year) %>%
+df_month <- df_aviation_dates %>%
+  group_by(Month, Year, IsGeneralAviation) %>%
   mutate(
-    count = sum(n) 
+    count = n(),
+    average = mean(n())
   ) %>%
   ungroup() %>%
-  arrange(Date) %>%
-  mutate(
-    frame = seq.int(nrow(df_date_polar))
-  )
+  arrange(Date) 
 
-df_month$smoothed <- predict(loess(n ~ as.numeric(Date), data = df_month), newdata = df_month[, c("Date")])
+df_month$frame <- seq.int(nrow(df_month))
 
+df_month
 
 fig <- df_month %>%
-  ggplot(aes(x = Month, y = count, group = Year, color = Year)) +
+  ggplot(aes(color = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other"))) +
   theme_bw() +
-  theme(
-    rect = element_blank(),
-    axis.title = element_blank(),
-    legend.position = "none"
-  ) +
-  labs(title = "Monthly Plane Accidents") +
-  geom_line(aes(group = Year), size = 0.15) +
-  geom_point(color = "gray20") +
-  scale_y_continuous() +
+  labs(title = "Average Monthly Plane Accidents") +
+  geom_line(data = df_month %>% filter(IsGeneralAviation), aes(x = Month, y = average, group = Year), size = 0.15) +
+  geom_line(data = df_month %>% filter(!IsGeneralAviation), aes(x = Month, y = average, group = Year), size = 0.15) +
+   labs(x = "Month",
+        y = "Accidents",
+        color = "Flight Type") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b", expand = expansion(add = c(0, -15))) +
-  geom_text(aes(x = as.Date("2020-10-01"), y = 300, label = Year), position = position_nudge(y = -0.1, x = 0), size = 10, color = "gray20") +
+  geom_text(aes(x = as.Date("2020-10-01"), y = 260, label = Year), position = position_nudge(y = -0.1, x = 0), size = 10, color = "gray20") +
   transition_reveal(along = frame, keep_last = FALSE)
 
-animate(fig, nframes = 200, fps = 10, width=1200,height=800, res = 130,
-        render = av_renderer("Monthly Airplane Accidents.mp4", codec = "libx264"))
 
+# animate(fig, nframes = 200, fps = 10, width=1200,height=800, res = 130,
+#         render = av_renderer("Monthly Airplane Accidents.mp4", codec = "libx264"))
 
+animate(fig, renderer = gifski_renderer(), width=1200, height=800)
 
 ```
 
 
+**Observations:**
+One reason we see more accidents in the middle of the year is that more people have time to fly (whether for hobby or travel) during the summer months due to the United States vacation schedule. More flights lead to more accidents.
 
-
+Another reason that may explain why accidents occur more often in June and July: during that time thunderstorms are more frequent and more severe, and microbursts can occur, leading to poor visibility and unstable flights (especially at landing).
 
 ### Weather conditions
 
@@ -292,42 +263,26 @@ fit_damage %>% tidy()
 **Observations:**
 
 
-```{r}
-
-df_date_polar <-df_aviation %>%
-  filter(str_detect(Aircraft.Category, "Airplane"), str_detect(Investigation.Type, "Accident")) %>%
-  mutate(
-    Month.Day = substr(Event.Date,2,6),
-    Year = substr(Event.Date, 8, 11),
-    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
-    Month = substr(Event.Date, 2, 3)
-  ) %>%
-  mutate(Month = as.integer(Month)) %>%
-  mutate(Fatal = as.logical(Total.Fatal.Injuries))
-  
-
-df_date_polar %>% summary()
-```
 
 
 # THIS PART IS NOT DONE!!!
 
-```{r}
- fit_date <-
-  glm(
-    formula = Fatal ~ Month + Weather.Condition,
-    data = df_date_polar %>%
-      filter(
-        !is.na(Fatal), 
-        Month %in% c(1, 7, 10),
-        Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
-      ) %>%
-      mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
-    family = "binomial"
-  )
-
-fit_date %>% tidy()
-```
+# ```{r}
+#  fit_date <-
+#   glm(
+#     formula = Fatal ~ Month + Weather.Condition,
+#     data = df_date_polar %>%
+#       filter(
+#         !is.na(Fatal), 
+#         Month %in% c(1, 7, 10),
+#         Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
+#       ) %>%
+#       mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
+#     family = "binomial"
+#   )
+# 
+# fit_date %>% tidy()
+# ```
 
 **Observations:**
 
