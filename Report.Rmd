@@ -3,11 +3,8 @@ title: 'Air Crash Investigation: How does Flight Conditions affect Fatality?'
 author: "Erika Lu & Sophie Wu"
 date: '2020-12-14'
 output:
-  html_document:
-    toc: yes
-    df_print: paged
   github_document:
-    toc: yes
+    toc: true
 ---
 
 ## Purpose
