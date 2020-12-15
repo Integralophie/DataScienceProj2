@@ -196,13 +196,14 @@ fig <- df_month %>%
 # animate(fig, nframes = 200, fps = 10, width=1200,height=800, res = 130,
 #         render = av_renderer("Monthly Airplane Accidents.mp4", codec = "libx264"))
 
-animate(fig, renderer = gifski_renderer(), width=1200, height=800)
+animate(fig, renderer = gifski_renderer(), width=600, height=400)
 
 ```
 
 
 **Observations:**
-This graph looks at occurences of accidents rather than fatality to better understand the dataset. 
+
+The last couple of graphs look at occurences of accidents rather than fatality to better understand the dataset. 
 
 One reason we may see more accidents in the middle of the year is that more people have time to fly (whether for hobby or travel) during the summer months due to the United States vacation schedule. More flights lead to more accidents. If the scope of our project was wider, we would analyze data on all flights, rather than just the accidents. 
 
@@ -229,7 +230,7 @@ blank_theme <- theme_minimal()+
   plot.title=element_text(size=14, face="bold"),
   )
 
-df_2003 <- df_aviation_dates %>%
+df_geo <- df_aviation_dates %>%
   select (
     Year,
     Longitude,
@@ -241,7 +242,7 @@ df_2003 <- df_aviation_dates %>%
 
 ggplot(data = world) +
   geom_sf() +
-  geom_point(data = df_2003, aes(x = Longitude, y = Latitude, fill = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other")), size = 1, 
+  geom_point(data = df_geo, aes(x = Longitude, y = Latitude, fill = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other")), size = 1, 
       shape = 23) +
   coord_sf(xlim = c(-130, -65), ylim = c(20, 60), expand = FALSE) +
   blank_theme +
