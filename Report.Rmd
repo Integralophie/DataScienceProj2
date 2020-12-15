@@ -21,6 +21,10 @@ The dataset we used contained information on air crashes investigated by the NTS
 
 The dataset includes information on not only military and commercial flights but general aviation as well. It is easier to get a piloting license for general aviation than other types of aviation and it is generally regarded as more dangerous because of lower safety standards.
 
+## Uncertainties
+
+The data on fatalities are collected from air crash investigation reports, and we can confidently assume that there are no sampling uncertainties in the collection of data, because our dataset is the population. However, we also believe that there's a underestimate of the number of air crashes: as we look through the dataset, it seems that not all of the crashes are represented in the dataset. For example, during the terrorist attack on September 11, 2001, four airplanes are hijecked and crashed, and the dataset only records one of them. 
+
 ## Setup
 
 ```{r}
@@ -148,6 +152,7 @@ df_aviation_dates %>%
   ggtitle("Accidents by Time of Year")
 ```
 
+
 ```{r}
 # AGGREGATED BY MONTH
 
@@ -250,6 +255,7 @@ fit_weather %>% tidy()
 
 **Observations:**
 
+According to the model, setting `UNK` as a reference, `VMC` has a much lower estimate comparing to `IMC`. This result is consistent with our conclusion from the bar chart: in IMC conditions, there is a higher odds of the air crash being fatal. The negative estimate for `VMC` 
 
 ### A model calculating the predicting effect of aircraft damage
 
@@ -270,27 +276,55 @@ fit_damage %>% tidy()
 
 **Observations:**
 
+The estimate for destroyed aircraft for modeling fatality is much higher, while there's no significant difference between minor damages and substantial damages (0.13 vs 0). This confirms our hypothesis of when an aircraft is severely damaged or destroyed, there is a higher probability of having fatalities. A destroyed aircraft is strongly correlated with fatalities. 
 
 
 
-# THIS PART IS NOT DONE!!!
+### Fitting a model with two variables
 
-# ```{r}
-#  fit_date <-
-#   glm(
-#     formula = Fatal ~ Month + Weather.Condition,
-#     data = df_date_polar %>%
-#       filter(
-#         !is.na(Fatal), 
-#         Month %in% c(1, 7, 10),
-#         Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
-#       ) %>%
-#       mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
-#     family = "binomial"
-#   )
-# 
-# fit_date %>% tidy()
-# ```
+We noticed from the previous figure that in June, July and August, there is a peak in air crashes. We thus made a hypothesis that the more frequent severe weather including thunderstroms are microbursts during that time period contributes to the higher frequency of air crashes. 
+
+```{r}
+
+df_date_polar <-df_aviation %>%
+  filter(str_detect(Aircraft.Category, "Airplane"), str_detect(Investigation.Type, "Accident")) %>%
+  mutate(
+    Month.Day = substr(Event.Date,2,6),
+    Year = substr(Event.Date, 8, 11),
+    Date = paste(Year, substr(Event.Date, 2, 3), substr(Event.Date,5,6), sep = "-", collapse = NULL),
+    Month = substr(Event.Date, 2, 3)
+  ) %>%
+  mutate(Month = as.integer(Month)) %>%
+  mutate(Fatal = as.logical(Total.Fatal.Injuries))
+  
+df_date_polar %>% summary()
+  fit_date <-
+   glm(
+     formula = Fatal ~ Month + Weather.Condition,
+     data = df_date_polar %>%
+       filter(
+         !is.na(Fatal), 
+         Month %in% c(6, 7, 8),
+         Weather.Condition %in% c(" IMC ", " VMC ", " UNK ")
+       ) %>%
+       mutate(Weather.Condition = fct_relevel(Weather.Condition, " UNK ")),
+     family = "binomial"
+   )
+ 
+ fit_date %>% tidy()
+```
 
 **Observations:**
+
+When the time of crashes `Month` is controlled, the estimate for `IMC` decreases and becomes negative, indicating that `IMC` is less effective at predicting fatality during summer. We can thus reject our hypothesis that severe weather is positively correlated to a higher fatality. 
+
+## Summary
+
+In this report, we studied air crashes investigated by NTSB from 1982 to 2007, and we identified variables that can potentially be used for predicting air crash fatalities. We use weather and aircraft damage as the main input variables to predict if a plane crash is fatal, and we figure out the correlation between these variables and a fatal crash. 
+
+For future studies, we would like to include more variables (e.g. the cause of crashes) that are not available in this dataset.
+
+
+
+
 
