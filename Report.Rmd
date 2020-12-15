@@ -4,7 +4,10 @@ author: "Erika Lu & Sophie Wu"
 date: '2020-12-14'
 output:
   github_document:
-    toc: true
+    toc: yes
+  html_document:
+    toc: yes
+    df_print: paged
 ---
 
 ## Purpose
@@ -20,7 +23,7 @@ The dataset includes information on not only military and commercial flights but
 
 ## Uncertainties
 
-The data on fatalities are collected from air crash investigation reports, and we can confidently assume that there are no sampling uncertainties in the collection of data, because our dataset is the population. However, we also believe that there's a underestimate of the number of air crashes: as we look through the dataset, it seems that not all of the crashes are represented in the dataset. For example, during the terrorist attack on September 11, 2001, four airplanes are hijecked and crashed, and the dataset only records one of them. 
+The data on fatalities are collected from air crash investigation reports, and may be able to assume that there are no sampling uncertainties in the collection of data, because our dataset is pretty close to the population. However, we also believe that there's a underestimate of the number of air crashes: as we look through the dataset, it seems that not all of the crashes are represented in the dataset. For example, during the terrorist attack on September 11, 2001, four airplanes are hijacked and crashed, and the dataset only records one of them. We do not know how many other accidents went unreported.
 
 ## Setup
 
