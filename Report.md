@@ -49,7 +49,7 @@ generally regarded as more dangerous because of lower safety standards.
 ## Uncertainties
 
 The data on fatalities are collected from air crash investigation
-reports, and may be able to assume that there are no sampling
+reports, and we may be able to assume that there are no sampling
 uncertainties in the collection of data, because our dataset is pretty
 close to the population. However, we also believe that there’s a
 underestimate of the number of air crashes: as we look through the
