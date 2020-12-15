@@ -4,10 +4,7 @@ author: "Erika Lu & Sophie Wu"
 date: '2020-12-14'
 output:
   github_document:
-    toc: yes
-  html_document:
-    toc: yes
-    df_print: paged
+    toc: true
 ---
 
 ## Purpose
@@ -48,7 +45,7 @@ df_aviation <- df_aviation %>%
     IsGeneralAviation = str_detect(FAR.Description, "91")
   )
 
-df_aviation
+
 ```
 
 ## Initial inspection of the dataset
