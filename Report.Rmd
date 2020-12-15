@@ -17,7 +17,9 @@ In this project, we focus on studying the air crash investigation dataset from N
 
 ## Background 
 
-The dataset we used contained information on air crashes investigated by the NTSB from 1982 to 2007. The investigation range of NTSB includes all air crashes happened within U.S. territory, or when the involved aircraft are U.S. made, or the aircraft carries passengers/crew members that are U.S. citizens, or otherwise invited by the transportation safety bureau from another country. Commercial airline crashes as well as other aviation crashes are included in this dataset. 
+The dataset we used contained information on air crashes investigated by the NTSB from 1982 to 2007. The investigation range of NTSB includes all air crashes happened within U.S. territory, or when the involved aircraft are U.S. made, or the aircraft carries passengers/crew members that are U.S. citizens, or otherwise invited by the transportation safety bureau from another country. 
+
+The dataset includes information on not only military and commercial flights but general aviation as well. It is easier to get a piloting license for general aviation than other types of aviation and it is generally regarded as more dangerous because of lower safety standards.
 
 ## Setup
 
@@ -53,7 +55,7 @@ df_aviation %>% glimpse()
 
 **Observations:**
 
-A glimpse at the dataset shows that 6,732 accidents and incidents are recorded in this dataset. 32 columns are presented, in which the total number of fatal, serious, and minor injuries, as well as the total uninjured number are recorded as output variables, and other variables including `Make`, `Model`, `Number.of.Engines`, `Engine.Type`, `Purpose.of.Flight` and `Broad.Phase.of.Flight` are interpreted as input variables in this study. 
+A glimpse at the dataset shows that 6,486 accidents and incidents are recorded in this dataset. 32 columns are presented (+1 added), in which the total number of fatal, serious, and minor injuries, as well as the total uninjured number are recorded as output variables, and other variables including `Make`, `Model`, `Number.of.Engines`, `Engine.Type`, `Purpose.of.Flight` and `Broad.Phase.of.Flight` are interpreted as input variables in this study. 
 
 ```{r}
 df_binomial <- df_aviation %>% mutate(Fatal = as.logical(Total.Fatal.Injuries))
@@ -62,7 +64,7 @@ df_binomial %>% count(Fatal)
 
 **Observations:**
 
-A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that from 1982 to 2007, there are 2623 non-fatal crashes and 944 fatal crashes, and 3165 flight crash information are not available. 
+A simple check on the `Total.Fatal.Injuries` column of the dataset reveals that from 1982 to 2007, there are 2505 non-fatal crashes and 943 fatal crashes, and 3038 flight crash information are not available. 
 
 ## Visualizations
 
@@ -128,10 +130,12 @@ df_aviation_dates$Date = as.Date(df_aviation_dates$Date, format = "%Y-%m-%d")
 df_aviation_dates$Month = as.Date(df_aviation_dates$Month, format = "%Y-%m-%d")
 
 ```
+
 ```{r}
-df_date %>%
+df_aviation_dates %>%
+  count(Month.Day) %>%
   ggplot() +
-  geom_point(mapping = aes(x = Month.Day, y = count )) +
+  geom_point(mapping = aes(x = Month.Day, y = n )) +
   scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
              date_labels = "%B") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
@@ -152,8 +156,6 @@ df_month <- df_aviation_dates %>%
   arrange(Date) 
 
 df_month$frame <- seq.int(nrow(df_month))
-
-df_month
 
 fig <- df_month %>%
   ggplot(aes(color = ifelse(IsGeneralAviation, "General Aviation", "Commercial + Other"))) +
